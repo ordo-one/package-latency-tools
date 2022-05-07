@@ -47,14 +47,21 @@ public struct LatencyStatistics
     {
         let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) // grand total all sample count
         var accumulatedSamples = 0 // current accumulation of sample during processing
+        var accumulatedSamplesPowerOfTwo = 0
 
         for currentBucket in 0 ..< bucketCount {
-            accumulatedSamples += Int(measurementBucketsPowerOfTwo[currentBucket])
+            accumulatedSamples += Int(measurementBuckets[currentBucket])
+            accumulatedSamplesPowerOfTwo += Int(measurementBucketsPowerOfTwo[currentBucket])
 
+            // Let's do percentiles for out linear buckets as far as possible
+            // then we fall back to power of two for remainders
             for percentile in 0 ..< percentiles.count {
-                if percentileResults[percentile] == nil &&
-                    Double(accumulatedSamples)/Double(totalSamples) >= (percentiles[percentile] / 100) {
-                    percentileResults[percentile] = 1 << currentBucket
+                if percentileResults[percentile] == nil {
+                    if Double(accumulatedSamples)/Double(totalSamples) >= (percentiles[percentile] / 100) {
+                        percentileResults[percentile] = currentBucket
+                    } else if Double(accumulatedSamplesPowerOfTwo)/Double(totalSamples) >= (percentiles[percentile] / 100) {
+                        percentileResults[percentile] = 1 << currentBucket
+                    }
                 }
             }
         }
