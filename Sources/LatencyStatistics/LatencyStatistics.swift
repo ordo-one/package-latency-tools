@@ -43,6 +43,7 @@ public struct LatencyStatistics
             percentile = currentBucket
         }
     }
+
     public mutating func calculate()
     {
         let totalSamples = measurementBuckets.reduce(0, +) // grand total all sample count
@@ -52,9 +53,11 @@ public struct LatencyStatistics
         var p99: Int? = nil
         var p99d9: Int? = nil
         var p100: Int? = nil
-
+        print("Calculate \(totalSamples)")
+        print("\(measurementBuckets)")
         for currentBucket in 0 ..< bucketCount {
             accumulatedSamples += measurementBuckets[currentBucket]
+print("\(accumulatedSamples) += \(measurementBuckets[currentBucket]) for \(currentBucket)")
             updatePercentile(percentile: &p50,
                              currentBucket: currentBucket,
                              accumulatedSamples: accumulatedSamples,
