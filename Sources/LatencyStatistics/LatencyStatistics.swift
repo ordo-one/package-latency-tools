@@ -16,7 +16,7 @@ public struct LatencyStatistics
         self.percentiles = percentiles
         measurementBucketsPowerOfTwo = [Int](repeating: 0, count: bucketCount)
         measurementBuckets = [Int](repeating: 0, count: bucketCount)
-        percentileResults = [Int](repeating: 0, count: self.percentiles.count)
+        percentileResults = [Int?](repeating: nil, count: self.percentiles.count)
     }
 
     
@@ -43,16 +43,6 @@ public struct LatencyStatistics
         measurementBuckets.removeAll(keepingCapacity: true)
     }
 
-    internal func updatePercentile(percentile: inout Int?,
-                                   currentBucket: Int,
-                                   accumulatedSamples: Int,
-                                   totalSamples: Int,
-                                   threshold: Double) {
-        if percentile == nil && Double(accumulatedSamples)/Double(totalSamples) >= (threshold / 100) {
-            percentile = 1 << currentBucket
-        }
-    }
-
     public mutating func calculate()
     {
         let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) // grand total all sample count
@@ -62,11 +52,10 @@ public struct LatencyStatistics
             accumulatedSamples += Int(measurementBucketsPowerOfTwo[currentBucket])
 
             for percentile in 0 ..< percentiles.count {
-                updatePercentile(percentile: &percentileResults[percentile],
-                                 currentBucket: currentBucket,
-                                 accumulatedSamples: accumulatedSamples,
-                                 totalSamples: totalSamples,
-                                 threshold: percentiles[percentile])
+                if percentileResults[percentile] == nil &&
+                    Double(accumulatedSamples)/Double(totalSamples) >= (percentiles[percentile] / 100) {
+                    percentileResults[percentile] = 1 << currentBucket
+                }
             }
         }
     }
