@@ -14,8 +14,7 @@ public struct LatencyStatistics
         l99 = 0
         l99d9 = 0
         l100 = 0
-        measurementBuckets = [Int]()
-        measurementBuckets.reserveCapacity(bucketCount)
+        measurementBuckets = [Int](repeating: 0, count: bucketCount)
     }
 
     
