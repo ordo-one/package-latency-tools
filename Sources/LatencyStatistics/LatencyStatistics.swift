@@ -22,6 +22,7 @@ public struct LatencyStatistics
     {
         let bucket = Int(ceil(log2(Double(measurement))))
         measurementBuckets[bucket] += 1
+        print("Adding one for \(measurement) to bucket \(bucket)")
     }
     
     public mutating func reset()
