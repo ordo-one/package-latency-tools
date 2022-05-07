@@ -39,9 +39,9 @@ public struct LatencyStatistics
                                    accumulatedSamples: Int,
                                    totalSamples: Int,
                                    threshold: Double) {
-        print("\(String(describing: percentile)) \(String(describing: currentBucket)) \(String(describing: accumulatedSamples)) \(String(describing: totalSamples)) \(String(describing: threshold)) \(Double(accumulatedSamples)/Double(totalSamples))")
+        print("\(String(describing: percentile)) \(String(describing: currentBucket)) \(String(describing: accumulatedSamples)) \(String(describing: totalSamples)) \(String(describing: threshold)) \(Double(accumulatedSamples)/Double(totalSamples)) -- \(1 << currentBucket)")
         if percentile == nil && Double(accumulatedSamples)/Double(totalSamples) >= (threshold / 100) {
-            percentile = 1 >> currentBucket
+            percentile = 1 << currentBucket
         }
     }
 
