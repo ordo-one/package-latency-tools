@@ -12,7 +12,7 @@ func main()
 
     var ls = LatencyStatistics()
 //    ls.process(fileName: fileName)
-    ls.printStatistics();
+//    ls.printStatistics();
 }
 
 main()
