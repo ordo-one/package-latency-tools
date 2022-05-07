@@ -40,8 +40,8 @@ public struct LatencyStatistics
                                    accumulatedSamples: Int,
                                    totalSamples: Int,
                                    threshold: Double) {
-        if percentile == nil && Double(accumulatedSamples)/Double(totalSamples) >= threshold {
-            percentile = currentBucket
+        if percentile == nil && Double(accumulatedSamples)/Double(totalSamples) >= (threshold / 100) {
+            percentile = 1 >> currentBucket
         }
     }
 
@@ -54,11 +54,10 @@ public struct LatencyStatistics
         var p99: Int? = nil
         var p99d9: Int? = nil
         var p100: Int? = nil
-        print("Calculate \(totalSamples)")
-        print("\(measurementBuckets)")
+
         for currentBucket in 0 ..< bucketCount {
             accumulatedSamples += measurementBuckets[currentBucket]
-print("\(accumulatedSamples) += \(measurementBuckets[currentBucket]) for \(currentBucket)")
+
             updatePercentile(percentile: &p50,
                              currentBucket: currentBucket,
                              accumulatedSamples: accumulatedSamples,
