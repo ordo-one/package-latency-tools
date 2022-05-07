@@ -7,7 +7,7 @@ public struct LatencyStatistics
 {
     public let bucketCount = 64
     public let percentiles: [Double] // current percentiles we calculate
-    public var percentileResults: [Int]
+    public var percentileResults: [Int?]
     public var measurementBucketsPowerOfTwo: [Int] // we do 1, 2, 4, 8, ... bucketCount - histogram
     public var measurementBuckets: [Int] // 1..bucketCount - histogram
 
@@ -57,13 +57,12 @@ public struct LatencyStatistics
     {
         let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) // grand total all sample count
         var accumulatedSamples = 0 // current accumulation of sample during processing
-        var currentPercentiles = [Int?](repeating: 0, count: self.percentiles.count)
 
         for currentBucket in 0 ..< bucketCount {
             accumulatedSamples += Int(measurementBucketsPowerOfTwo[currentBucket])
 
             for percentile in 0 ..< percentiles.count {
-                updatePercentile(percentile: &currentPercentiles[percentile],
+                updatePercentile(percentile: &percentileResults[percentile],
                                  currentBucket: currentBucket,
                                  accumulatedSamples: accumulatedSamples,
                                  totalSamples: totalSamples,
@@ -76,7 +75,7 @@ public struct LatencyStatistics
     {
         var result = ""
         for percentile in 0 ..< percentiles.count {
-            result += "\(percentiles[percentile]) <= \(percentileResults[percentile])μs \n"
+            result += "\(percentiles[percentile]) <= \(percentileResults[percentile] ?? 0)μs \n"
         }
         return result
     }
