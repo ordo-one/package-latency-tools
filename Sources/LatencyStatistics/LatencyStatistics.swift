@@ -1,9 +1,11 @@
 import Foundation
+import Numerics
 
 public struct LatencyStatistics
 {
-    var l50, l80, l99, l99d9, l100: Int64
-    var measurements: [Int64]
+    var l50, l80, l99, l99d9, l100: Int
+    var measurementBuckets: [Int] // we do 1, 2, 4, 8, ... buckets
+    let bucketCount = 64
 
     public init()
     {
@@ -12,17 +14,15 @@ public struct LatencyStatistics
         l99 = 0
         l99d9 = 0
         l100 = 0
-        measurements = [Int64]();
+        measurementBuckets = [Int]()
+        measurementBuckets.reserveCapacity(bucketCount)
     }
 
-    public mutating func reserveCapacity(_ capacity: Int)
-    {
-        measurements.reserveCapacity(capacity)
-    }
     
     public mutating func add(_ measurement: Int64)
     {
-        measurements.append(measurement)
+        let bucket = Int(ceil(log2(Double(measurement))))
+        measurementBuckets[bucket] += 1
     }
     
     public mutating func reset()
@@ -32,65 +32,72 @@ public struct LatencyStatistics
         l99 = 0
         l99d9 = 0
         l100 = 0
-        measurements = []
+        measurementBuckets.removeAll(keepingCapacity: true)
     }
-    
+
+    internal func updatePercentile(percentile: inout Int?,
+                                   currentBucket: Int,
+                                   accumulatedSamples: Int,
+                                   totalSamples: Int,
+                                   threshold: Double) {
+        if percentile == nil && Double(accumulatedSamples)/Double(totalSamples) >= threshold {
+            percentile = currentBucket
+        }
+    }
     public mutating func calculate()
     {
-        let size = measurements.count
-        
-        guard size != 0 else {
-            reset()
-            return
+        let totalSamples = measurementBuckets.reduce(0, +) // grand total all sample count
+        var accumulatedSamples = 0 // current accumulation of sample during processing
+        var p50: Int? = nil
+        var p80: Int? = nil
+        var p99: Int? = nil
+        var p99d9: Int? = nil
+        var p100: Int? = nil
+
+        for currentBucket in 0 ..< bucketCount {
+            accumulatedSamples += measurementBuckets[currentBucket]
+            updatePercentile(percentile: &p50,
+                             currentBucket: currentBucket,
+                             accumulatedSamples: accumulatedSamples,
+                             totalSamples: totalSamples,
+                             threshold: 50)
+            updatePercentile(percentile: &p80,
+                             currentBucket: currentBucket,
+                             accumulatedSamples: accumulatedSamples,
+                             totalSamples: totalSamples,
+                             threshold: 80)
+            updatePercentile(percentile: &p99,
+                             currentBucket: currentBucket,
+                             accumulatedSamples: accumulatedSamples,
+                             totalSamples: totalSamples,
+                             threshold: 99)
+            updatePercentile(percentile: &p99d9,
+                             currentBucket: currentBucket,
+                             accumulatedSamples: accumulatedSamples,
+                             totalSamples: totalSamples,
+                             threshold: 99.9)
+            updatePercentile(percentile: &p100,
+                             currentBucket: currentBucket,
+                             accumulatedSamples: accumulatedSamples,
+                             totalSamples: totalSamples,
+                             threshold: 100)
         }
-        
-        measurements.sort()
-
-        let p50 = 50 * size / 100
-        l50 = measurements[p50]
-
-        let p80 = 80 * size / 100
-        l80 = measurements[p80]
-
-        let p99 = 99 * size / 100
-        l99 = measurements[p99]
-
-        let p99d9 = 999 * size / 1000
-        l99d9 = measurements[p99d9]
-
-        l100 = measurements.last!
+        l50 = p50 ?? 0
+        l80 = p80 ?? 0
+        l99 = p99 ?? 0
+        l99d9 = p99d9 ?? 0
+        l100 = p100 ?? 0
     }
     
-    public mutating func process(fileName: String) {
-        do {
-            let content = try String(contentsOfFile: fileName)
-
-            let stringNumbers = content.split() { char in
-                if char.isNumber {
-                    return false
-                } else {
-                    return true
-                }
-            }
-
-            measurements = stringNumbers.map { Int64($0)! }
-            
-            calculate()
-            
-        } catch {
-            print(error)
-            return
-        }
-    }
 
     public func output() -> String
     {
         return "  50% <= \(l50)\n  80% <= \(l80)\n  99% <= \(l99)\n99.9% <= \(l99d9)\n 100% <= \(l100)"
     }
     
-    private func format(_ number: Int64) -> String
+    private func format(_ number: Int) -> String
     {
-        return "\(number) usec"
+        return "\(number) μs"
     }
     
     public func printStatistics()
@@ -102,12 +109,4 @@ public struct LatencyStatistics
         print(" 100% <= \(format(l100))")
     }
     
-    public func printRawData()
-    {
-        print("[\(measurements.count)](", separator: "", terminator: "");
-        for a in measurements {
-            print("\(a)", separator: "", terminator: "")
-        }
-        print(")")
-    }
 }
