@@ -6,7 +6,7 @@ import Glibc
 #error("Unsupported Platform")
 #endif
 
-public class LatencyTimer {
+public final class LatencyTimer {
     
     let name: String;
     
