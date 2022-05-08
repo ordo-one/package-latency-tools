@@ -5,17 +5,19 @@ public let defaultPercentiles = [50.0, 80.0, 99.0, 99.9, 100.0]
 
 public struct LatencyStatistics
 {
-    public let bucketCount = 64
+    public let bucketCount = 32
+    public let linearBucketCount: Int
     public let percentiles: [Double] // current percentiles we calculate
     public var percentileResults: [Int?]
     public var measurementBucketsPowerOfTwo: [Int] // we do 1, 2, 4, 8, ... bucketCount - histogram
     public var measurementBuckets: [Int] // 1..bucketCount - histogram
 
-    public init(_ percentiles:[Double] = defaultPercentiles)
+    public init(linearBucketCount:Int = 100, percentiles:[Double] = defaultPercentiles)
     {
+        self.linearBucketCount = linearBucketCount
         self.percentiles = percentiles
         measurementBucketsPowerOfTwo = [Int](repeating: 0, count: bucketCount)
-        measurementBuckets = [Int](repeating: 0, count: bucketCount)
+        measurementBuckets = [Int](repeating: 0, count: self.linearBucketCount)
         percentileResults = [Int?](repeating: nil, count: self.percentiles.count)
     }
 
@@ -24,14 +26,22 @@ public struct LatencyStatistics
     @inline(__always)
     public mutating func add(_ measurement: Int)
     {
-        let validBucketRange = 0..<bucketCount
         let bucket = Int(ceil(log2(Double(measurement))))
-        measurementBucketsPowerOfTwo[bucket] += 1
+
+        assert(bucket < bucketCount, "bucket >= \(bucketCount)")
+
+        if bucket < bucketCount {
+            measurementBucketsPowerOfTwo[bucket] += 1
+        } else {
+            measurementBucketsPowerOfTwo[bucketCount-1] += 1
+        }
+
+        let validBucketRange = 0..<linearBucketCount
 
         if validBucketRange.contains(measurement) {
             measurementBuckets[measurement] += 1
         } else {
-            measurementBuckets[bucketCount-1] += 1
+            measurementBuckets[linearBucketCount-1] += 1
         }
 
     }
@@ -51,7 +61,7 @@ public struct LatencyStatistics
 
         // Let's do percentiles for out linear buckets as far as possible
         // then we fall back to power of two for remainders
-        for currentBucket in 0 ..< (bucketCount-1) {
+        for currentBucket in 0 ..< (linearBucketCount-1) {
             accumulatedSamples += Int(measurementBuckets[currentBucket])
 
             for percentile in 0 ..< percentiles.count {
