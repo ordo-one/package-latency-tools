@@ -14,7 +14,7 @@ public struct LatencyStatistics
 
     public init(linearBucketCount:Int = 100, percentiles:[Double] = defaultPercentiles)
     {
-        self.linearBucketCount = linearBucketCount
+        self.linearBucketCount = linearBucketCount > 0 ? linearBucketCount : 1
         self.percentiles = percentiles
         measurementBucketsPowerOfTwo = [Int](repeating: 0, count: bucketCount)
         measurementBuckets = [Int](repeating: 0, count: self.linearBucketCount)
@@ -26,7 +26,7 @@ public struct LatencyStatistics
     @inline(__always)
     public mutating func add(_ measurement: Int)
     {
-        let bucket = Int(ceil(log2(Double(measurement))))
+        let bucket = measurement > 0 ? Int(ceil(log2(Double(measurement)))) : 0
 
         assert(bucket < bucketCount, "bucket >= \(bucketCount)")
 

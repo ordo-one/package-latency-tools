@@ -38,6 +38,6 @@ let package = Package(
             dependencies: ["LatencyStatistics"]),
         .testTarget(
             name: "LatencyTimerTests",
-            dependencies: ["LatencyTimer"]),
+            dependencies: ["LatencyTimer", "LatencyStatistics"]),
     ]
 )
