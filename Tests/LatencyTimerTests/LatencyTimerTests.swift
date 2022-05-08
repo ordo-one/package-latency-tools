@@ -56,4 +56,14 @@ final class LatencyTimerTests: XCTestCase {
         latencyStats.calculate()
         print(latencyStats.output())
     }
+
+    func testThatLatencyStatisticsCalculatesCorrectWith11Buckets() throws {
+        var latencyStats = LatencyStatistics.init(bucketCount: 1)
+        for _ in 1...100_000 {
+            latencyStats.add(1)
+        }
+        latencyStats.calculate()
+        print(latencyStats.output())
+    }
+
 }

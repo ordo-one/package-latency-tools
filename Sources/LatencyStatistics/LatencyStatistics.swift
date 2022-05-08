@@ -89,9 +89,18 @@ public struct LatencyStatistics
     public func histogramPowerOfTwo() -> String {
         let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) // grand total all sample count
         var histogram = ""
-        for currentBucket in 0 ..< bucketCountPowerOfTwo {
+        var firstNonEmptyBucket = bucketCountPowerOfTwo
+
+        for currentBucket in 1 ..< bucketCountPowerOfTwo {
+            if measurementBucketsPowerOfTwo[bucketCountPowerOfTwo - currentBucket] > 0 {
+                firstNonEmptyBucket = bucketCountPowerOfTwo - currentBucket
+                break
+            }
+        }
+
+        for currentBucket in 0 ..< firstNonEmptyBucket {
             var histogramMarkers = "\(currentBucket) = "
-            for _ in 0 ..< Int(((Double(measurementBucketsPowerOfTwo[currentBucket]) / Double(totalSamples)) * 100.0)) {
+            for _ in 0 ..< Int(((Double(measurementBucketsPowerOfTwo[currentBucket]) / Double(totalSamples)) * 80.0)) {
                 histogramMarkers += "*"
             }
             histogram += histogramMarkers + "\n"
