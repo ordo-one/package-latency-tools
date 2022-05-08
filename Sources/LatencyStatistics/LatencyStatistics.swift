@@ -1,24 +1,26 @@
 import Foundation
 import Numerics
 
-public let defaultPercentiles = [50.0, 80.0, 99.0, 99.9, 100.0]
+public let defaultPercentilesToCalculate = [50.0, 80.0, 99.0, 99.9, 100.0]
 
 public struct LatencyStatistics
 {
-    public let bucketCount = 32
-    public let linearBucketCount: Int
-    public let percentiles: [Double] // current percentiles we calculate
-    public var percentileResults: [Int?]
+    public let bucketCountLinear: Int
+    public let bucketCountPowerOfTwo = 32
+    public var measurementBucketsLinear: [Int] // 1..bucketCount - histogram
     public var measurementBucketsPowerOfTwo: [Int] // we do 1, 2, 4, 8, ... bucketCount - histogram
-    public var measurementBuckets: [Int] // 1..bucketCount - histogram
+    public let percentilesToCalculate: [Double] // current percentiles we calculate
+    public var percentileResults: [Int?]
+    public var bucketOverflowLinear = 0
+    public var bucketOverflowPowerOfTwo = 0
 
-    public init(linearBucketCount:Int = 100, percentiles:[Double] = defaultPercentiles)
+    public init(bucketCount:Int = 100, percentiles:[Double] = defaultPercentilesToCalculate)
     {
-        self.linearBucketCount = linearBucketCount > 0 ? linearBucketCount : 1
-        self.percentiles = percentiles
-        measurementBucketsPowerOfTwo = [Int](repeating: 0, count: bucketCount)
-        measurementBuckets = [Int](repeating: 0, count: self.linearBucketCount)
-        percentileResults = [Int?](repeating: nil, count: self.percentiles.count)
+        bucketCountLinear = bucketCount < 1 ? 1 : bucketCount + 1 // we don't use the zero bucket, so add one
+        percentilesToCalculate = percentiles
+        measurementBucketsPowerOfTwo = [Int](repeating: 0, count: bucketCountPowerOfTwo)
+        measurementBucketsLinear = [Int](repeating: 0, count: bucketCountLinear)
+        percentileResults = [Int?](repeating: nil, count: percentilesToCalculate.count)
     }
 
     
@@ -26,31 +28,32 @@ public struct LatencyStatistics
     @inline(__always)
     public mutating func add(_ measurement: Int)
     {
+        let validBucketRangePowerOfTwo = 0..<bucketCountPowerOfTwo
         let bucket = measurement > 0 ? Int(ceil(log2(Double(measurement)))) : 0
 
-        assert(bucket < bucketCount, "bucket >= \(bucketCount)")
-
-        if bucket < bucketCount {
+        if validBucketRangePowerOfTwo.contains(bucket) {
             measurementBucketsPowerOfTwo[bucket] += 1
         } else {
-            measurementBucketsPowerOfTwo[bucketCount-1] += 1
+            bucketOverflowPowerOfTwo += 1
         }
 
-        let validBucketRange = 0..<linearBucketCount
+        let validBucketRangeLinear = 0..<bucketCountLinear
 
-        if validBucketRange.contains(measurement) {
-            measurementBuckets[measurement] += 1
+        if validBucketRangeLinear.contains(measurement) {
+            measurementBucketsLinear[measurement] += 1
         } else {
-            measurementBuckets[linearBucketCount-1] += 1
+            bucketOverflowLinear += 1
         }
 
     }
     
     public mutating func reset()
     {
+        bucketOverflowLinear = 0
+        bucketOverflowPowerOfTwo = 0
         percentileResults.removeAll(keepingCapacity: true)
         measurementBucketsPowerOfTwo.removeAll(keepingCapacity: true)
-        measurementBuckets.removeAll(keepingCapacity: true)
+        measurementBucketsLinear.removeAll(keepingCapacity: true)
     }
 
     public mutating func calculate()
@@ -61,34 +64,53 @@ public struct LatencyStatistics
 
         // Let's do percentiles for out linear buckets as far as possible
         // then we fall back to power of two for remainders
-        for currentBucket in 0 ..< (linearBucketCount-1) {
-            accumulatedSamples += Int(measurementBuckets[currentBucket])
+        for currentBucket in 0 ..< bucketCountLinear {
+            accumulatedSamples += Int(measurementBucketsLinear[currentBucket])
 
-            for percentile in 0 ..< percentiles.count {
+            for percentile in 0 ..< percentilesToCalculate.count {
                 if percentileResults[percentile] == nil &&
-                    Double(accumulatedSamples)/Double(totalSamples) >= (percentiles[percentile] / 100) {
+                    Double(accumulatedSamples)/Double(totalSamples) >= (percentilesToCalculate[percentile] / 100) {
                     percentileResults[percentile] = currentBucket
                 }
             }
         }
-        for currentBucket in 0 ..< bucketCount {
+        for currentBucket in 0 ..< bucketCountPowerOfTwo {
             accumulatedSamplesPowerOfTwo += Int(measurementBucketsPowerOfTwo[currentBucket])
 
-            for percentile in 0 ..< percentiles.count {
+            for percentile in 0 ..< percentilesToCalculate.count {
                 if percentileResults[percentile] == nil &&
-                    Double(accumulatedSamplesPowerOfTwo)/Double(totalSamples) >= (percentiles[percentile] / 100) {
+                    Double(accumulatedSamplesPowerOfTwo)/Double(totalSamples) >= (percentilesToCalculate[percentile] / 100) {
                     percentileResults[percentile] = 1 << currentBucket
                 }
             }
         }
     }
-    
+
+    public func histogramPowerOfTwo() -> String {
+        let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) // grand total all sample count
+        var histogram = ""
+        for currentBucket in 0 ..< bucketCountPowerOfTwo {
+            var histogramMarkers = "\(currentBucket) = "
+            for _ in 0 ..< Int(((Double(measurementBucketsPowerOfTwo[currentBucket]) / Double(totalSamples)) * 100.0)) {
+                histogramMarkers += "*"
+            }
+            histogram += histogramMarkers + "\n"
+        }
+        return histogram
+    }
+
     public func output() -> String
     {
         var result = ""
-        for percentile in 0 ..< percentiles.count {
-            result += "\(percentiles[percentile]) <= \(percentileResults[percentile] ?? 0)μs \n"
+
+        for percentile in 0 ..< percentilesToCalculate.count {
+            result += "\(percentilesToCalculate[percentile]) <= \(percentileResults[percentile] ?? 0)μs \n"
         }
-        return result
+
+        if bucketOverflowPowerOfTwo > 0 {
+            result += "Warning: discarded out of bound samples with time > \(1 << bucketCountPowerOfTwo) = \(bucketOverflowPowerOfTwo)\n"
+        }
+
+        return result + histogramPowerOfTwo()
     }
 }
