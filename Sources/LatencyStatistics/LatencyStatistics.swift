@@ -108,7 +108,7 @@ public struct LatencyStatistics
             }
 
             for currentBucket in firstNonEmptyBucket ... lastNonEmptyBucket {
-                var histogramMarkers = "\(currentBucket) = "
+                var histogramMarkers = "\(powerOfTwo ? 1 << currentBucket : currentBucket) = "
                 var markerCount = Int(((Double(measurementBuckets[currentBucket]) / Double(totalSamples)) * 100.0))
                 // always print a single * if there's any samples in the bucket
                 if measurementBuckets[currentBucket] > 0 && markerCount == 0 {
