@@ -2,6 +2,7 @@ import Foundation
 import Numerics
 
 public let defaultPercentilesToCalculate = [50.0, 80.0, 99.0, 99.9, 100.0]
+private let numberPadding = 10
 
 public struct LatencyStatistics
 {
@@ -108,7 +109,7 @@ public struct LatencyStatistics
             }
 
             for currentBucket in firstNonEmptyBucket ... lastNonEmptyBucket {
-                var histogramMarkers = "\(powerOfTwo ? 1 << currentBucket : currentBucket) = "
+                var histogramMarkers = "\((powerOfTwo ? 1 << currentBucket : currentBucket).paddedString(to:numberPadding)) = "
                 var markerCount = Int(((Double(measurementBuckets[currentBucket]) / Double(totalSamples)) * 100.0))
                 // always print a single * if there's any samples in the bucket
                 if measurementBuckets[currentBucket] > 0 && markerCount == 0 {
@@ -138,7 +139,7 @@ public struct LatencyStatistics
                 for _ in 0 ..<  Int(((Double(bucketOverflowLinear) / Double(totalSamples)) * 100.0)) {
                     histogramMarkers += "*"
                 }
-                histogram += "\(measurementBucketsLinear.count - 1) > \(histogramMarkers)\n"
+                histogram += "\((measurementBucketsLinear.count - 1).paddedString(to:numberPadding)) > \(histogramMarkers)\n"
             }
             histogram += "\n"
         }
@@ -153,7 +154,7 @@ public struct LatencyStatistics
             for _ in 0 ..<  Int(((Double(bucketOverflowPowerOfTwo) / Double(totalSamples)) * 100.0)) {
                 histogramMarkers += "*"
             }
-            histogram += "\(1 << measurementBucketsPowerOfTwo.count) > \(histogramMarkers)\n"
+            histogram += "\((1 << measurementBucketsPowerOfTwo.count).paddedString(to:numberPadding)) > \(histogramMarkers)\n"
         }
 
         return histogram
@@ -167,9 +168,9 @@ public struct LatencyStatistics
 
         for percentile in 0 ..< percentilesToCalculate.count {
             if percentileResults[percentile] != nil {
-                result += "\(percentilesToCalculate[percentile]) <= \(percentileResults[percentile] ?? 0)μs \n"
+                result += "\((percentilesToCalculate[percentile]).paddedString(to:numberPadding)) <= \(percentileResults[percentile] ?? 0)μs \n"
             } else {
-                result += "\(percentilesToCalculate[percentile]) > \(1 << bucketCountPowerOfTwo)μs \n"
+                result += "\((percentilesToCalculate[percentile]).paddedString(to:numberPadding))  > \(1 << bucketCountPowerOfTwo)μs \n"
             }
         }
 
@@ -178,5 +179,25 @@ public struct LatencyStatistics
         }
 
         return result + histogram()
+    }
+}
+
+extension Int {
+     func paddedString(to: Int) -> String {
+        var result = String(self)
+         for _ in 0 ..< (to - result.count) {
+            result = " " + result
+        }
+        return result
+    }
+}
+
+extension Double {
+    func paddedString(to: Int) -> String {
+        var result = String(self)
+        for _ in 0 ..< (to - result.count) {
+            result = " " + result
+        }
+        return result
     }
 }
