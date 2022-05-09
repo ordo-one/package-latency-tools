@@ -56,70 +56,127 @@ public struct LatencyStatistics
         measurementBucketsLinear.removeAll(keepingCapacity: true)
     }
 
-    public mutating func calculate()
+    public mutating func calculateStatistics()
     {
-        let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) // grand total all sample count
-        var accumulatedSamples = 0 // current accumulation of sample during processing
-        var accumulatedSamplesPowerOfTwo = 0
+        func calculatePercentiles(for measurementBuckets:[Int], totalSamples: Int, powerOfTwo:Bool) {
+            var accumulatedSamples = 0 // current accumulation of sample during processing
 
-        // Let's do percentiles for out linear buckets as far as possible
-        // then we fall back to power of two for remainders
-        for currentBucket in 0 ..< bucketCountLinear {
-            accumulatedSamples += Int(measurementBucketsLinear[currentBucket])
+            for currentBucket in 0 ..< measurementBuckets.count {
+                accumulatedSamples += Int(measurementBuckets[currentBucket])
 
-            for percentile in 0 ..< percentilesToCalculate.count {
-                if percentileResults[percentile] == nil &&
-                    Double(accumulatedSamples)/Double(totalSamples) >= (percentilesToCalculate[percentile] / 100) {
-                    percentileResults[percentile] = currentBucket
+                for percentile in 0 ..< percentilesToCalculate.count {
+                    if percentileResults[percentile] == nil &&
+                        Double(accumulatedSamples)/Double(totalSamples) >= (percentilesToCalculate[percentile] / 100) {
+                        percentileResults[percentile] = powerOfTwo ? 1 << currentBucket  : currentBucket
+                    }
                 }
             }
         }
-        for currentBucket in 0 ..< bucketCountPowerOfTwo {
-            accumulatedSamplesPowerOfTwo += Int(measurementBucketsPowerOfTwo[currentBucket])
 
-            for percentile in 0 ..< percentilesToCalculate.count {
-                if percentileResults[percentile] == nil &&
-                    Double(accumulatedSamplesPowerOfTwo)/Double(totalSamples) >= (percentilesToCalculate[percentile] / 100) {
-                    percentileResults[percentile] = 1 << currentBucket
-                }
-            }
-        }
+        let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
+        
+        // Let's do percentiles for out linear buckets as far as possible, then fall back to power of two
+        calculatePercentiles(for: measurementBucketsLinear, totalSamples: totalSamples, powerOfTwo: false)
+        calculatePercentiles(for: measurementBucketsPowerOfTwo, totalSamples: totalSamples, powerOfTwo: true)
     }
 
-    public func histogramPowerOfTwo() -> String {
-        let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) // grand total all sample count
-        var histogram = ""
-        var firstNonEmptyBucket = bucketCountPowerOfTwo
+    public func histogram() -> String {
+        let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
 
-        for currentBucket in 1 ..< bucketCountPowerOfTwo {
-            if measurementBucketsPowerOfTwo[bucketCountPowerOfTwo - currentBucket] > 0 {
-                firstNonEmptyBucket = bucketCountPowerOfTwo - currentBucket
-                break
+        func generateHistogram(for measurementBuckets:[Int], totalSamples: Int, powerOfTwo:Bool) -> String {
+            var histogram = ""
+            let bucketCount = measurementBuckets.count
+            var firstNonEmptyBucket = 0
+            var lastNonEmptyBucket = 0
+
+            guard bucketCount > 0 else {
+                return ""
             }
+
+            for currentBucket in 0 ..< bucketCount {
+                if measurementBuckets[currentBucket] > 0 {
+                    firstNonEmptyBucket = currentBucket
+                    break
+                }
+            }
+
+            for currentBucket in 0 ..< bucketCount {
+                if measurementBuckets[bucketCount - currentBucket - 1] > 0 {
+                    lastNonEmptyBucket = bucketCount - currentBucket - 1
+                    break
+                }
+            }
+
+            for currentBucket in firstNonEmptyBucket ... lastNonEmptyBucket {
+                var histogramMarkers = "\(currentBucket) = "
+                var markerCount = Int(((Double(measurementBuckets[currentBucket]) / Double(totalSamples)) * 100.0))
+                // always print a single * if there's any samples in the bucket
+                if measurementBuckets[currentBucket] > 0 && markerCount == 0 {
+                    markerCount = 1
+                }
+
+                for _ in 0 ..<  markerCount {
+                    histogramMarkers += "*"
+                }
+                histogram += histogramMarkers + "\n"
+
+                if firstNonEmptyBucket == lastNonEmptyBucket && measurementBuckets[currentBucket] == 0 {
+                    histogram = ""
+                }
+            }
+            return histogram
         }
 
-        for currentBucket in 0 ..< firstNonEmptyBucket {
-            var histogramMarkers = "\(currentBucket) = "
-            for _ in 0 ..< Int(((Double(measurementBucketsPowerOfTwo[currentBucket]) / Double(totalSamples)) * 80.0)) {
+        var histogram = "\n"
+
+        if measurementBucketsLinear.count > 1 {
+            histogram += "Linear histogram: \n" + generateHistogram(for: measurementBucketsLinear,
+                                                                       totalSamples: totalSamples,
+                                                                       powerOfTwo:false)
+            if bucketOverflowLinear > 0 {
+                var histogramMarkers = ""
+                for _ in 0 ..<  Int(((Double(bucketOverflowLinear) / Double(totalSamples)) * 100.0)) {
+                    histogramMarkers += "*"
+                }
+                histogram += "\(measurementBucketsLinear.count - 1) > \(histogramMarkers)\n"
+            }
+            histogram += "\n"
+        }
+
+        histogram += "Power of Two histogram:\n" +
+                         generateHistogram(for: measurementBucketsPowerOfTwo,
+                                           totalSamples: totalSamples,
+                                           powerOfTwo:true)
+
+        if bucketOverflowPowerOfTwo > 0 {
+            var histogramMarkers = ""
+            for _ in 0 ..<  Int(((Double(bucketOverflowPowerOfTwo) / Double(totalSamples)) * 100.0)) {
                 histogramMarkers += "*"
             }
-            histogram += histogramMarkers + "\n"
+            histogram += "\(1 << measurementBucketsPowerOfTwo.count) > \(histogramMarkers)\n"
         }
+
         return histogram
     }
 
-    public func output() -> String
+    public mutating func output() -> String
     {
         var result = ""
 
+        calculateStatistics()
+
         for percentile in 0 ..< percentilesToCalculate.count {
-            result += "\(percentilesToCalculate[percentile]) <= \(percentileResults[percentile] ?? 0)μs \n"
+            if percentileResults[percentile] != nil {
+                result += "\(percentilesToCalculate[percentile]) <= \(percentileResults[percentile] ?? 0)μs \n"
+            } else {
+                result += "\(percentilesToCalculate[percentile]) > \(1 << bucketCountPowerOfTwo)μs \n"
+            }
         }
 
         if bucketOverflowPowerOfTwo > 0 {
             result += "Warning: discarded out of bound samples with time > \(1 << bucketCountPowerOfTwo) = \(bucketOverflowPowerOfTwo)\n"
         }
 
-        return result + histogramPowerOfTwo()
+        return result + histogram()
     }
 }
