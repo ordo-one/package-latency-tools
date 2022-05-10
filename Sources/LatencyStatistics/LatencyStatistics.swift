@@ -129,6 +129,10 @@ public struct LatencyStatistics
         let totalSamples = measurementBucketsLinear.reduce(0, +) + bucketOverflowLinear
         var histogram = ""
 
+        guard totalSamples > 0 else {
+            return "Zero samples, no linear histogram available.\n"
+        }
+
         if measurementBucketsLinear.count > 1 {
             histogram += "Linear histogram (\(totalSamples) samples): \n" + generateHistogram(for: measurementBucketsLinear,
                                                                        totalSamples: totalSamples,
@@ -151,6 +155,10 @@ public struct LatencyStatistics
         let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
         var histogram = ""
 
+        guard totalSamples > 0 else {
+            return "Zero samples, no power of two histogram available.\n"
+        }
+
         histogram += "Power of Two histogram (\(totalSamples) samples):\n" +
         generateHistogram(for: measurementBucketsPowerOfTwo,
                           totalSamples: totalSamples,
@@ -172,6 +180,10 @@ public struct LatencyStatistics
     {
         let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
         var result = "Percentile measurements (\(totalSamples) samples):\n"
+
+        guard totalSamples > 0 else {
+            return "Zero samples, no percentile distribution available.\n"
+        }
 
         calculateStatistics()
 
