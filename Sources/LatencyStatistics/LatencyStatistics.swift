@@ -14,6 +14,8 @@ public struct LatencyStatistics
     public var percentileResults: [Int?]
     public var bucketOverflowLinear = 0
     public var bucketOverflowPowerOfTwo = 0
+    public var averageMeasurement = 0.0
+    public var measurementCount = 0
 
     public init(bucketCount:Int = 100, percentiles:[Double] = defaultPercentilesToCalculate)
     {
@@ -32,6 +34,10 @@ public struct LatencyStatistics
         let validBucketRangePowerOfTwo = 0..<bucketCountPowerOfTwo
         let bucket = measurement > 0 ? Int(ceil(log2(Double(measurement)))) : 0
 
+        averageMeasurement = (Double(measurementCount) * averageMeasurement + Double(measurement))
+                            / Double(measurementCount + 1)
+        measurementCount += 1
+
         if validBucketRangePowerOfTwo.contains(bucket) {
             measurementBucketsPowerOfTwo[bucket] += 1
         } else {
@@ -45,7 +51,6 @@ public struct LatencyStatistics
         } else {
             bucketOverflowLinear += 1
         }
-
     }
     
     public mutating func reset()
@@ -129,6 +134,8 @@ public struct LatencyStatistics
         let totalSamples = measurementBucketsLinear.reduce(0, +) + bucketOverflowLinear
         var histogram = ""
 
+        assert(measurementCount == totalSamples, "measurementCount != totalSamples")
+
         guard totalSamples > 0 else {
             return "Zero samples, no linear histogram available.\n"
         }
@@ -155,6 +162,8 @@ public struct LatencyStatistics
         let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
         var histogram = ""
 
+        assert(measurementCount == totalSamples, "measurementCount != totalSamples")
+
         guard totalSamples > 0 else {
             return "Zero samples, no power of two histogram available.\n"
         }
@@ -179,7 +188,11 @@ public struct LatencyStatistics
     public mutating func percentileStatistics() -> String
     {
         let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
-        var result = "Percentile measurements (\(totalSamples) samples):\n"
+
+        assert(measurementCount == totalSamples, "measurementCount != totalSamples")
+
+        var result = "Percentile measurements (\(totalSamples) samples," +
+                     " average \(String(format: "%.2f", averageMeasurement))):\n"
 
         guard totalSamples > 0 else {
             return "Zero samples, no percentile distribution available.\n"
