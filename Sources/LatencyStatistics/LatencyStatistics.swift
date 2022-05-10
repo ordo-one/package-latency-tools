@@ -55,6 +55,8 @@ public struct LatencyStatistics
     
     public mutating func reset()
     {
+        averageMeasurement = 0.0
+        measurementCount = 0
         bucketOverflowLinear = 0
         bucketOverflowPowerOfTwo = 0
         percentileResults.removeAll(keepingCapacity: true)
