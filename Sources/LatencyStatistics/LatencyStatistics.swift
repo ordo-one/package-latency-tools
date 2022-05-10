@@ -81,57 +81,56 @@ public struct LatencyStatistics
         calculatePercentiles(for: measurementBucketsPowerOfTwo, totalSamples: totalSamples, powerOfTwo: true)
     }
 
-    public func histogram() -> String {
-        let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
+    private func generateHistogram(for measurementBuckets:[Int], totalSamples: Int, powerOfTwo:Bool) -> String {
+        var histogram = ""
+        let bucketCount = measurementBuckets.count
+        var firstNonEmptyBucket = 0
+        var lastNonEmptyBucket = 0
 
-        func generateHistogram(for measurementBuckets:[Int], totalSamples: Int, powerOfTwo:Bool) -> String {
-            var histogram = ""
-            let bucketCount = measurementBuckets.count
-            var firstNonEmptyBucket = 0
-            var lastNonEmptyBucket = 0
-
-            guard bucketCount > 0 else {
-                return ""
-            }
-
-            for currentBucket in 0 ..< bucketCount {
-                if measurementBuckets[currentBucket] > 0 {
-                    firstNonEmptyBucket = currentBucket
-                    break
-                }
-            }
-
-            for currentBucket in 0 ..< bucketCount {
-                if measurementBuckets[bucketCount - currentBucket - 1] > 0 {
-                    lastNonEmptyBucket = bucketCount - currentBucket - 1
-                    break
-                }
-            }
-
-            for currentBucket in firstNonEmptyBucket ... lastNonEmptyBucket {
-                var histogramMarkers = "\((powerOfTwo ? 1 << currentBucket : currentBucket).paddedString(to:numberPadding)) = "
-                var markerCount = Int(((Double(measurementBuckets[currentBucket]) / Double(totalSamples)) * 100.0))
-                // always print a single * if there's any samples in the bucket
-                if measurementBuckets[currentBucket] > 0 && markerCount == 0 {
-                    markerCount = 1
-                }
-
-                for _ in 0 ..<  markerCount {
-                    histogramMarkers += "*"
-                }
-                histogram += histogramMarkers + "\n"
-
-                if firstNonEmptyBucket == lastNonEmptyBucket && measurementBuckets[currentBucket] == 0 {
-                    histogram = ""
-                }
-            }
-            return histogram
+        guard bucketCount > 0 else {
+            return ""
         }
 
-        var histogram = "\n"
+        for currentBucket in 0 ..< bucketCount {
+            if measurementBuckets[currentBucket] > 0 {
+                firstNonEmptyBucket = currentBucket
+                break
+            }
+        }
+
+        for currentBucket in 0 ..< bucketCount {
+            if measurementBuckets[bucketCount - currentBucket - 1] > 0 {
+                lastNonEmptyBucket = bucketCount - currentBucket - 1
+                break
+            }
+        }
+
+        for currentBucket in firstNonEmptyBucket ... lastNonEmptyBucket {
+            var histogramMarkers = "\((powerOfTwo ? 1 << currentBucket : currentBucket).paddedString(to:numberPadding)) = "
+            var markerCount = Int(((Double(measurementBuckets[currentBucket]) / Double(totalSamples)) * 100.0))
+            // always print a single * if there's any samples in the bucket
+            if measurementBuckets[currentBucket] > 0 && markerCount == 0 {
+                markerCount = 1
+            }
+
+            for _ in 0 ..<  markerCount {
+                histogramMarkers += "*"
+            }
+            histogram += histogramMarkers + "\n"
+
+            if firstNonEmptyBucket == lastNonEmptyBucket && measurementBuckets[currentBucket] == 0 {
+                histogram = ""
+            }
+        }
+        return histogram
+    }
+
+    public func histogramLinear() -> String {
+        let totalSamples = measurementBucketsLinear.reduce(0, +) + bucketOverflowLinear
+        var histogram = ""
 
         if measurementBucketsLinear.count > 1 {
-            histogram += "Linear histogram: \n" + generateHistogram(for: measurementBucketsLinear,
+            histogram += "Linear histogram (\(totalSamples) samples): \n" + generateHistogram(for: measurementBucketsLinear,
                                                                        totalSamples: totalSamples,
                                                                        powerOfTwo:false)
             if bucketOverflowLinear > 0 {
@@ -144,10 +143,18 @@ public struct LatencyStatistics
             histogram += "\n"
         }
 
-        histogram += "Power of Two histogram:\n" +
-                         generateHistogram(for: measurementBucketsPowerOfTwo,
-                                           totalSamples: totalSamples,
-                                           powerOfTwo:true)
+        return histogram
+    }
+
+    public mutating func histogramPowerOfTwo() -> String
+    {
+        let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
+        var histogram = ""
+
+        histogram += "Power of Two histogram (\(totalSamples) samples):\n" +
+        generateHistogram(for: measurementBucketsPowerOfTwo,
+                          totalSamples: totalSamples,
+                          powerOfTwo:true)
 
         if bucketOverflowPowerOfTwo > 0 {
             var histogramMarkers = ""
@@ -158,11 +165,13 @@ public struct LatencyStatistics
         }
 
         return histogram
+
     }
 
-    public mutating func output() -> String
+    public mutating func percentileStatistics() -> String
     {
-        var result = ""
+        let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
+        var result = "Percentile measurements (\(totalSamples) samples):\n"
 
         calculateStatistics()
 
@@ -178,7 +187,12 @@ public struct LatencyStatistics
             result += "Warning: discarded out of bound samples with time > \(1 << bucketCountPowerOfTwo) = \(bucketOverflowPowerOfTwo)\n"
         }
 
-        return result + histogram()
+        return result
+    }
+
+    public mutating func output() -> String
+    {
+        return percentileStatistics() + "\n" + histogramLinear() + "\n" + histogramPowerOfTwo()
     }
 }
 
