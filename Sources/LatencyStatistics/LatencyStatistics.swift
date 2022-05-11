@@ -151,6 +151,9 @@ public struct LatencyStatistics
                 for _ in 0 ..<  Int(((Double(bucketOverflowLinear) / Double(totalSamples)) * 100.0)) {
                     histogramMarkers += "*"
                 }
+                if histogramMarkers.count == 0 {
+                    histogramMarkers += "*"
+                }
                 histogram += "\((measurementBucketsLinear.count - 1).paddedString(to:numberPadding)) > \(histogramMarkers)\n"
             }
             histogram += "\n"
@@ -178,6 +181,9 @@ public struct LatencyStatistics
         if bucketOverflowPowerOfTwo > 0 {
             var histogramMarkers = ""
             for _ in 0 ..<  Int(((Double(bucketOverflowPowerOfTwo) / Double(totalSamples)) * 100.0)) {
+                histogramMarkers += "*"
+            }
+            if histogramMarkers.count == 0 {
                 histogramMarkers += "*"
             }
             histogram += "\((1 << measurementBucketsPowerOfTwo.count).paddedString(to:numberPadding)) > \(histogramMarkers)\n"
