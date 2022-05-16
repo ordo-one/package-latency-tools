@@ -91,26 +91,13 @@ public struct LatencyStatistics
     private func generateHistogram(for measurementBuckets:[Int], totalSamples: Int, powerOfTwo:Bool) -> String {
         var histogram = ""
         let bucketCount = measurementBuckets.count
-        var firstNonEmptyBucket = 0
-        var lastNonEmptyBucket = 0
 
         guard bucketCount > 0 else {
             return ""
         }
 
-        for currentBucket in 0 ..< bucketCount {
-            if measurementBuckets[currentBucket] > 0 {
-                firstNonEmptyBucket = currentBucket
-                break
-            }
-        }
-
-        for currentBucket in 0 ..< bucketCount {
-            if measurementBuckets[bucketCount - currentBucket - 1] > 0 {
-                lastNonEmptyBucket = bucketCount - currentBucket - 1
-                break
-            }
-        }
+        let firstNonEmptyBucket = measurementBuckets.firstIndex(where: {$0 > 0}) ?? 0
+        let lastNonEmptyBucket = measurementBuckets.lastIndex(where: {$0 > 0}) ?? 0
 
         for currentBucket in firstNonEmptyBucket ... lastNonEmptyBucket {
             var histogramMarkers = "\((powerOfTwo ? 1 << currentBucket : currentBucket).paddedString(to:numberPadding)) = "
