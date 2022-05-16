@@ -1,113 +1,250 @@
 import Foundation
+import Numerics
+
+public let defaultPercentilesToCalculate = [50.0, 80.0, 99.0, 99.9, 100.0]
+private let numberPadding = 10
 
 public struct LatencyStatistics
 {
-    var l50, l80, l99, l99d9, l100: Int64
-    var measurements: [Int64]
+    public let bucketCountLinear: Int
+    public let bucketCountPowerOfTwo = 32
+    public var measurementBucketsLinear: [Int] // 1..bucketCount - histogram
+    public var measurementBucketsPowerOfTwo: [Int] // we do 1, 2, 4, 8, ... bucketCount - histogram
+    public let percentilesToCalculate: [Double] // current percentiles we calculate
+    public var percentileResults: [Int?]
+    public var bucketOverflowLinear = 0
+    public var bucketOverflowPowerOfTwo = 0
+    public var averageMeasurement = 0.0
+    public var measurementCount = 0
 
-    public init()
+    public init(bucketCount:Int = 100, percentiles:[Double] = defaultPercentilesToCalculate)
     {
-        l50 = 0
-        l80 = 0
-        l99 = 0
-        l99d9 = 0
-        l100 = 0
-        measurements = [Int64]();
+        bucketCountLinear = bucketCount < 1 ? 1 : bucketCount + 1 // we don't use the zero bucket, so add one
+        percentilesToCalculate = percentiles
+        measurementBucketsPowerOfTwo = [Int](repeating: 0, count: bucketCountPowerOfTwo)
+        measurementBucketsLinear = [Int](repeating: 0, count: bucketCountLinear)
+        percentileResults = [Int?](repeating: nil, count: percentilesToCalculate.count)
     }
 
-    public mutating func reserveCapacity(_ capacity: Int)
-    {
-        measurements.reserveCapacity(capacity)
-    }
     
-    public mutating func add(_ measurement: Int64)
+    @inlinable
+    @inline(__always)
+    public mutating func add(_ measurement: Int)
     {
-        measurements.append(measurement)
+        let validBucketRangePowerOfTwo = 0..<bucketCountPowerOfTwo
+        let bucket = measurement > 0 ? Int(ceil(log2(Double(measurement)))) : 0
+
+        averageMeasurement = (Double(measurementCount) * averageMeasurement + Double(measurement))
+                            / Double(measurementCount + 1)
+        measurementCount += 1
+
+        if validBucketRangePowerOfTwo.contains(bucket) {
+            measurementBucketsPowerOfTwo[bucket] += 1
+        } else {
+            bucketOverflowPowerOfTwo += 1
+        }
+
+        let validBucketRangeLinear = 0..<bucketCountLinear
+
+        if validBucketRangeLinear.contains(measurement) {
+            measurementBucketsLinear[measurement] += 1
+        } else {
+            bucketOverflowLinear += 1
+        }
     }
     
     public mutating func reset()
     {
-        l50 = 0
-        l80 = 0
-        l99 = 0
-        l99d9 = 0
-        l100 = 0
-        measurements = []
+        averageMeasurement = 0.0
+        measurementCount = 0
+        bucketOverflowLinear = 0
+        bucketOverflowPowerOfTwo = 0
+        percentileResults.removeAll(keepingCapacity: true)
+        measurementBucketsPowerOfTwo.removeAll(keepingCapacity: true)
+        measurementBucketsLinear.removeAll(keepingCapacity: true)
     }
-    
-    public mutating func calculate()
+
+    public mutating func calculateStatistics()
     {
-        let size = measurements.count
-        
-        guard size != 0 else {
-            reset()
-            return
-        }
-        
-        measurements.sort()
+        func calculatePercentiles(for measurementBuckets:[Int], totalSamples: Int, powerOfTwo:Bool) {
+            var accumulatedSamples = 0 // current accumulation of sample during processing
 
-        let p50 = 50 * size / 100
-        l50 = measurements[p50]
+            for currentBucket in 0 ..< measurementBuckets.count {
+                accumulatedSamples += Int(measurementBuckets[currentBucket])
 
-        let p80 = 80 * size / 100
-        l80 = measurements[p80]
-
-        let p99 = 99 * size / 100
-        l99 = measurements[p99]
-
-        let p99d9 = 999 * size / 1000
-        l99d9 = measurements[p99d9]
-
-        l100 = measurements.last!
-    }
-    
-    public mutating func process(fileName: String) {
-        do {
-            let content = try String(contentsOfFile: fileName)
-
-            let stringNumbers = content.split() { char in
-                if char.isNumber {
-                    return false
-                } else {
-                    return true
+                for percentile in 0 ..< percentilesToCalculate.count {
+                    if percentileResults[percentile] == nil &&
+                        Double(accumulatedSamples)/Double(totalSamples) >= (percentilesToCalculate[percentile] / 100) {
+                        percentileResults[percentile] = powerOfTwo ? 1 << currentBucket  : currentBucket
+                    }
                 }
             }
-
-            measurements = stringNumbers.map { Int64($0)! }
-            
-            calculate()
-            
-        } catch {
-            print(error)
-            return
         }
+
+        let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
+        
+        // Let's do percentiles for out linear buckets as far as possible, then fall back to power of two
+        calculatePercentiles(for: measurementBucketsLinear, totalSamples: totalSamples, powerOfTwo: false)
+        calculatePercentiles(for: measurementBucketsPowerOfTwo, totalSamples: totalSamples, powerOfTwo: true)
     }
 
-    public func output() -> String
-    {
-        return "  50% <= \(l50)\n  80% <= \(l80)\n  99% <= \(l99)\n99.9% <= \(l99d9)\n 100% <= \(l100)"
-    }
-    
-    private func format(_ number: Int64) -> String
-    {
-        return "\(number) usec"
-    }
-    
-    public func printStatistics()
-    {
-        print("  50% <= \(format(l50))")
-        print("  80% <= \(format(l80))")
-        print("  99% <= \(format(l99))")
-        print("99.9% <= \(format(l99d9))")
-        print(" 100% <= \(format(l100))")
-    }
-    
-    public func printRawData()
-    {
-        print("[\(measurements.count)](", separator: "", terminator: "");
-        for a in measurements {
-            print("\(a)", separator: "", terminator: "")
+    private func generateHistogram(for measurementBuckets:[Int], totalSamples: Int, powerOfTwo:Bool) -> String {
+        var histogram = ""
+        let bucketCount = measurementBuckets.count
+        var firstNonEmptyBucket = 0
+        var lastNonEmptyBucket = 0
+
+        guard bucketCount > 0 else {
+            return ""
         }
-        print(")")
+
+        for currentBucket in 0 ..< bucketCount {
+            if measurementBuckets[currentBucket] > 0 {
+                firstNonEmptyBucket = currentBucket
+                break
+            }
+        }
+
+        for currentBucket in 0 ..< bucketCount {
+            if measurementBuckets[bucketCount - currentBucket - 1] > 0 {
+                lastNonEmptyBucket = bucketCount - currentBucket - 1
+                break
+            }
+        }
+
+        for currentBucket in firstNonEmptyBucket ... lastNonEmptyBucket {
+            var histogramMarkers = "\((powerOfTwo ? 1 << currentBucket : currentBucket).paddedString(to:numberPadding)) = "
+            var markerCount = Int(((Double(measurementBuckets[currentBucket]) / Double(totalSamples)) * 100.0))
+            // always print a single * if there's any samples in the bucket
+            if measurementBuckets[currentBucket] > 0 && markerCount == 0 {
+                markerCount = 1
+            }
+
+            for _ in 0 ..<  markerCount {
+                histogramMarkers += "*"
+            }
+            histogram += histogramMarkers + "\n"
+
+            if firstNonEmptyBucket == lastNonEmptyBucket && measurementBuckets[currentBucket] == 0 {
+                histogram = ""
+            }
+        }
+        return histogram
+    }
+
+    public func histogramLinear() -> String {
+        let totalSamples = measurementBucketsLinear.reduce(0, +) + bucketOverflowLinear
+        var histogram = ""
+
+        assert(measurementCount == totalSamples, "measurementCount != totalSamples")
+
+        guard totalSamples > 0 else {
+            return "Zero samples, no linear histogram available.\n"
+        }
+
+        if measurementBucketsLinear.count > 1 {
+            histogram += "Linear histogram (\(totalSamples) samples): \n" + generateHistogram(for: measurementBucketsLinear,
+                                                                       totalSamples: totalSamples,
+                                                                       powerOfTwo:false)
+            if bucketOverflowLinear > 0 {
+                var histogramMarkers = ""
+                for _ in 0 ..<  Int(((Double(bucketOverflowLinear) / Double(totalSamples)) * 100.0)) {
+                    histogramMarkers += "*"
+                }
+                if histogramMarkers.count == 0 {
+                    histogramMarkers += "*"
+                }
+                histogram += "\((measurementBucketsLinear.count - 1).paddedString(to:numberPadding)) > \(histogramMarkers)\n"
+            }
+            histogram += "\n"
+        }
+
+        return histogram
+    }
+
+    public mutating func histogramPowerOfTwo() -> String
+    {
+        let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
+        var histogram = ""
+
+        assert(measurementCount == totalSamples, "measurementCount != totalSamples")
+
+        guard totalSamples > 0 else {
+            return "Zero samples, no power of two histogram available.\n"
+        }
+
+        histogram += "Power of Two histogram (\(totalSamples) samples):\n" +
+        generateHistogram(for: measurementBucketsPowerOfTwo,
+                          totalSamples: totalSamples,
+                          powerOfTwo:true)
+
+        if bucketOverflowPowerOfTwo > 0 {
+            var histogramMarkers = ""
+            for _ in 0 ..<  Int(((Double(bucketOverflowPowerOfTwo) / Double(totalSamples)) * 100.0)) {
+                histogramMarkers += "*"
+            }
+            if histogramMarkers.count == 0 {
+                histogramMarkers += "*"
+            }
+            histogram += "\((1 << measurementBucketsPowerOfTwo.count).paddedString(to:numberPadding)) > \(histogramMarkers)\n"
+        }
+
+        return histogram
+
+    }
+
+    public mutating func percentileStatistics() -> String
+    {
+        let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
+
+        assert(measurementCount == totalSamples, "measurementCount != totalSamples")
+
+        var result = "Percentile measurements (\(totalSamples) samples," +
+                     " average \(String(format: "%.2f", averageMeasurement))):\n"
+
+        guard totalSamples > 0 else {
+            return "Zero samples, no percentile distribution available.\n"
+        }
+
+        calculateStatistics()
+
+        for percentile in 0 ..< percentilesToCalculate.count {
+            if percentileResults[percentile] != nil {
+                result += "\((percentilesToCalculate[percentile]).paddedString(to:numberPadding)) <= \(percentileResults[percentile] ?? 0)μs \n"
+            } else {
+                result += "\((percentilesToCalculate[percentile]).paddedString(to:numberPadding))  > \(1 << bucketCountPowerOfTwo)μs \n"
+            }
+        }
+
+        if bucketOverflowPowerOfTwo > 0 {
+            result += "Warning: discarded out of bound samples with time > \(1 << bucketCountPowerOfTwo) = \(bucketOverflowPowerOfTwo)\n"
+        }
+
+        return result
+    }
+
+    public mutating func output() -> String
+    {
+        return percentileStatistics() + "\n" + histogramLinear() + "\n" + histogramPowerOfTwo()
+    }
+}
+
+extension Int {
+     func paddedString(to: Int) -> String {
+        var result = String(self)
+         for _ in 0 ..< (to - result.count) {
+            result = " " + result
+        }
+        return result
+    }
+}
+
+extension Double {
+    func paddedString(to: Int) -> String {
+        var result = String(self)
+        for _ in 0 ..< (to - result.count) {
+            result = " " + result
+        }
+        return result
     }
 }

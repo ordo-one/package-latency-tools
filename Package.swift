@@ -20,7 +20,7 @@ let package = Package(
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
-        // .package(url: /* package url */, from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -30,12 +30,14 @@ let package = Package(
             dependencies: []),
         .target(
             name: "LatencyStatistics",
-            dependencies: []),
+            dependencies: [
+                .product(name: "Numerics", package: "swift-numerics"),
+             ]),
         .executableTarget(
             name: "LatencyStatisticsCLI",
             dependencies: ["LatencyStatistics"]),
         .testTarget(
             name: "LatencyTimerTests",
-            dependencies: ["LatencyTimer"]),
+            dependencies: ["LatencyTimer", "LatencyStatistics"]),
     ]
 )

@@ -11,8 +11,8 @@ func main()
     let fileName = CommandLine.arguments[1];
 
     var ls = LatencyStatistics()
-    ls.process(fileName: fileName)
-    ls.printStatistics();
+//    ls.process(fileName: fileName)
+//    ls.printStatistics();
 }
 
 main()

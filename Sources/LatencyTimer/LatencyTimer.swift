@@ -6,7 +6,7 @@ import Glibc
 #error("Unsupported Platform")
 #endif
 
-public class LatencyTimer {
+public final class LatencyTimer {
     
     let name: String;
     
@@ -21,7 +21,9 @@ public class LatencyTimer {
     public func reserveCapacity(_ capacity: Int) {
         measurements.reserveCapacity(capacity)
     }
-    
+
+    @inlinable
+    @inline(__always)
     public static func getTimestamp() -> UInt64
     {
         var tm = timeval();
