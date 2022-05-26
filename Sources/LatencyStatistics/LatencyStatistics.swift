@@ -4,8 +4,7 @@ import Numerics
 public let defaultPercentilesToCalculate = [50.0, 80.0, 99.0, 99.9, 100.0]
 private let numberPadding = 10
 
-public struct LatencyStatistics
-{
+public struct LatencyStatistics {
     public let bucketCountLinear: Int
     public let bucketCountPowerOfTwo = 32
     public var measurementBucketsLinear: [Int] // 1..bucketCount - histogram
@@ -17,8 +16,7 @@ public struct LatencyStatistics
     public var averageMeasurement = 0.0
     public var measurementCount = 0
 
-    public init(bucketCount:Int = 100, percentiles:[Double] = defaultPercentilesToCalculate)
-    {
+    public init(bucketCount: Int = 100, percentiles: [Double] = defaultPercentilesToCalculate) {
         bucketCountLinear = bucketCount < 1 ? 1 : bucketCount + 1 // we don't use the zero bucket, so add one
         percentilesToCalculate = percentiles
         measurementBucketsPowerOfTwo = [Int](repeating: 0, count: bucketCountPowerOfTwo)
@@ -26,11 +24,9 @@ public struct LatencyStatistics
         percentileResults = [Int?](repeating: nil, count: percentilesToCalculate.count)
     }
 
-    
     @inlinable
     @inline(__always)
-    public mutating func add(_ measurement: Int)
-    {
+    public mutating func add(_ measurement: Int) {
         let validBucketRangePowerOfTwo = 0..<bucketCountPowerOfTwo
         let bucket = measurement > 0 ? Int(ceil(log2(Double(measurement)))) : 0
 
@@ -52,9 +48,8 @@ public struct LatencyStatistics
             bucketOverflowLinear += 1
         }
     }
-    
-    public mutating func reset()
-    {
+
+    public mutating func reset() {
         averageMeasurement = 0.0
         measurementCount = 0
         bucketOverflowLinear = 0
@@ -64,9 +59,8 @@ public struct LatencyStatistics
         measurementBucketsLinear.removeAll(keepingCapacity: true)
     }
 
-    public mutating func calculateStatistics()
-    {
-        func calculatePercentiles(for measurementBuckets:[Int], totalSamples: Int, powerOfTwo:Bool) {
+    public mutating func calculateStatistics() {
+        func calculatePercentiles(for measurementBuckets: [Int], totalSamples: Int, powerOfTwo: Bool) {
             var accumulatedSamples = 0 // current accumulation of sample during processing
 
             for currentBucket in 0 ..< measurementBuckets.count {
@@ -82,13 +76,13 @@ public struct LatencyStatistics
         }
 
         let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
-        
+
         // Let's do percentiles for out linear buckets as far as possible, then fall back to power of two
         calculatePercentiles(for: measurementBucketsLinear, totalSamples: totalSamples, powerOfTwo: false)
         calculatePercentiles(for: measurementBucketsPowerOfTwo, totalSamples: totalSamples, powerOfTwo: true)
     }
 
-    private func generateHistogram(for measurementBuckets:[Int], totalSamples: Int, powerOfTwo:Bool) -> String {
+    private func generateHistogram(for measurementBuckets: [Int], totalSamples: Int, powerOfTwo: Bool) -> String {
         var histogram = ""
         let bucketCount = measurementBuckets.count
 
@@ -100,7 +94,7 @@ public struct LatencyStatistics
         let lastNonEmptyBucket = measurementBuckets.lastIndex(where: {$0 > 0}) ?? 0
 
         for currentBucket in firstNonEmptyBucket ... lastNonEmptyBucket {
-            var histogramMarkers = "\((powerOfTwo ? 1 << currentBucket : currentBucket).paddedString(to:numberPadding)) = "
+            var histogramMarkers = "\((powerOfTwo ? 1 << currentBucket : currentBucket).paddedString(to: numberPadding)) = "
             var markerCount = Int(((Double(measurementBuckets[currentBucket]) / Double(totalSamples)) * 100.0))
             // always print a single * if there's any samples in the bucket
             if measurementBuckets[currentBucket] > 0 && markerCount == 0 {
@@ -132,7 +126,7 @@ public struct LatencyStatistics
         if measurementBucketsLinear.count > 1 {
             histogram += "Linear histogram (\(totalSamples) samples): \n" + generateHistogram(for: measurementBucketsLinear,
                                                                        totalSamples: totalSamples,
-                                                                       powerOfTwo:false)
+                                                                       powerOfTwo: false)
             if bucketOverflowLinear > 0 {
                 var histogramMarkers = ""
                 for _ in 0 ..<  Int(((Double(bucketOverflowLinear) / Double(totalSamples)) * 100.0)) {
@@ -141,7 +135,7 @@ public struct LatencyStatistics
                 if histogramMarkers.count == 0 {
                     histogramMarkers += "*"
                 }
-                histogram += "\((measurementBucketsLinear.count - 1).paddedString(to:numberPadding)) > \(histogramMarkers)\n"
+                histogram += "\((measurementBucketsLinear.count - 1).paddedString(to: numberPadding)) > \(histogramMarkers)\n"
             }
             histogram += "\n"
         }
@@ -149,8 +143,7 @@ public struct LatencyStatistics
         return histogram
     }
 
-    public mutating func histogramPowerOfTwo() -> String
-    {
+    public mutating func histogramPowerOfTwo() -> String {
         let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
         var histogram = ""
 
@@ -163,7 +156,7 @@ public struct LatencyStatistics
         histogram += "Power of Two histogram (\(totalSamples) samples):\n" +
         generateHistogram(for: measurementBucketsPowerOfTwo,
                           totalSamples: totalSamples,
-                          powerOfTwo:true)
+                          powerOfTwo: true)
 
         if bucketOverflowPowerOfTwo > 0 {
             var histogramMarkers = ""
@@ -173,15 +166,14 @@ public struct LatencyStatistics
             if histogramMarkers.count == 0 {
                 histogramMarkers += "*"
             }
-            histogram += "\((1 << measurementBucketsPowerOfTwo.count).paddedString(to:numberPadding)) > \(histogramMarkers)\n"
+            histogram += "\((1 << measurementBucketsPowerOfTwo.count).paddedString(to: numberPadding)) > \(histogramMarkers)\n"
         }
 
         return histogram
 
     }
 
-    public mutating func percentileStatistics() -> String
-    {
+    public mutating func percentileStatistics() -> String {
         let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
 
         assert(measurementCount == totalSamples, "measurementCount != totalSamples")
@@ -197,9 +189,9 @@ public struct LatencyStatistics
 
         for percentile in 0 ..< percentilesToCalculate.count {
             if percentileResults[percentile] != nil {
-                result += "\((percentilesToCalculate[percentile]).paddedString(to:numberPadding)) <= \(percentileResults[percentile] ?? 0)μs \n"
+                result += "\((percentilesToCalculate[percentile]).paddedString(to: numberPadding)) <= \(percentileResults[percentile] ?? 0)μs \n"
             } else {
-                result += "\((percentilesToCalculate[percentile]).paddedString(to:numberPadding))  > \(1 << bucketCountPowerOfTwo)μs \n"
+                result += "\((percentilesToCalculate[percentile]).paddedString(to: numberPadding))  > \(1 << bucketCountPowerOfTwo)μs \n"
             }
         }
 
@@ -210,8 +202,7 @@ public struct LatencyStatistics
         return result
     }
 
-    public mutating func output() -> String
-    {
+    public mutating func output() -> String {
         return percentileStatistics() + "\n" + histogramLinear() + "\n" + histogramPowerOfTwo()
     }
 }

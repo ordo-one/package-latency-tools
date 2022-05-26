@@ -2,7 +2,7 @@ import XCTest
 @testable import LatencyTimer
 @testable import LatencyStatistics
 
-final class LatencyTimerTests: XCTestCase {
+final class LatencyStatisticsTests: XCTestCase {
     func testThatLatencyStatisticsCalculatesCorrectPercentilesWithLinear() throws {
         var latencyStats = LatencyStatistics.init(bucketCount: 10_000,
                                                   percentiles: [1.0, 33.0, 50.0, 100.0])
@@ -50,7 +50,7 @@ final class LatencyTimerTests: XCTestCase {
     }
 
     func testThatLatencyStatisticsCalculatesCorrectWith100Buckets() throws {
-        var percentiles :[Double] = []
+        var percentiles: [Double] = []
         for n in 1...100 {
             percentiles.append(Double(n))
         }
