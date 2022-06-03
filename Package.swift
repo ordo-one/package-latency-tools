@@ -4,7 +4,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "LatencyTools",
+    name: "package-latency-tools",
     platforms: [
         .macOS(.v12)
     ],
