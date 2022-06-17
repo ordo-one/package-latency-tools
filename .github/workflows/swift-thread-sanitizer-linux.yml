@@ -1,0 +1,31 @@
+name: Swift thread sanitizer Linux
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  thread-sanitizer-linux:
+    runs-on: [self-hosted, ubuntu-latest]
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Git URL token override
+      run: git config --global url."https://ordo-ci:${{ secrets.CI_MACHINE_PAT }}@github.com".insteadOf "https://github.com"
+
+    # Required to clean build directory before thread sanitizer if running address sanitizer first!
+    - name: Clean before debug build thread sanitizier
+      run: swift package clean
+
+    - name: Run thread sanitizer
+      run: swift test --sanitize=thread | swift demangle
+      
+    - name: Clean before release build thread sanitizier
+      run: swift package clean
+      
+    - name: Run thread sanitizer on release build
+      run: swift test --sanitize=thread -c release -Xswiftc -enable-testing | swift demangle
