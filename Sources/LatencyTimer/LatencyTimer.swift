@@ -22,6 +22,8 @@ public final class LatencyTimer {
         measurements.reserveCapacity(capacity)
     }
 
+    /// Get a timestamp value for statistics
+    /// - Returns: A timestamp value in microseconds
     @inlinable
     @inline(__always)
     public static func getTimestamp() -> UInt64 {

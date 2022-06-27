@@ -4,6 +4,7 @@ import Numerics
 public let defaultPercentilesToCalculate = [50.0, 80.0, 99.0, 99.9, 100.0]
 private let numberPadding = 10
 
+/// A type that provides distribution / percentile calculations of latency measurements
 public struct LatencyStatistics {
     public let bucketCountLinear: Int
     public let bucketCountPowerOfTwo = 32
@@ -24,6 +25,8 @@ public struct LatencyStatistics {
         percentileResults = [Int?](repeating: nil, count: percentilesToCalculate.count)
     }
 
+    /// Add a measurement for inclusion in statistics
+    /// - Parameter measurement: A measurement expressed in microseconds
     @inlinable
     @inline(__always)
     public mutating func add(_ measurement: Int) {
@@ -49,6 +52,7 @@ public struct LatencyStatistics {
         }
     }
 
+    /// Reset all acummulated statistics
     public mutating func reset() {
         averageMeasurement = 0.0
         measurementCount = 0
@@ -59,6 +63,7 @@ public struct LatencyStatistics {
         measurementBucketsLinear.removeAll(keepingCapacity: true)
     }
 
+    /// Perform percentile calculations based on the accumulated statistics
     public mutating func calculateStatistics() {
         func calculatePercentiles(for measurementBuckets: [Int], totalSamples: Int, powerOfTwo: Bool) {
             var accumulatedSamples = 0 // current accumulation of sample during processing
@@ -113,6 +118,8 @@ public struct LatencyStatistics {
         return histogram
     }
 
+    /// A printable text-based histogram suitable for display in a fixed-size font
+    /// - Returns: The histogram - linear buckets
     public func histogramLinear() -> String {
         let totalSamples = measurementBucketsLinear.reduce(0, +) + bucketOverflowLinear
         var histogram = ""
@@ -143,6 +150,8 @@ public struct LatencyStatistics {
         return histogram
     }
 
+    /// A printable text-based histogram suitable for display in a fixed-size font
+    /// - Returns: The histogram - power of two buckets
     public mutating func histogramPowerOfTwo() -> String {
         let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
         var histogram = ""
@@ -173,6 +182,9 @@ public struct LatencyStatistics {
 
     }
 
+
+    /// A printable text-based  percentile statistics suitable for display in a fixed-size font
+    /// - Returns: The percentiles
     public mutating func percentileStatistics() -> String {
         let totalSamples = measurementBucketsPowerOfTwo.reduce(0, +) + bucketOverflowPowerOfTwo
 
@@ -202,6 +214,8 @@ public struct LatencyStatistics {
         return result
     }
 
+    /// A printable text-based histogram+percentiles suitable for display in a fixed-size font
+    /// - Returns: All collected statistics
     public mutating func output() -> String {
         return percentileStatistics() + "\n" + histogramLinear() + "\n" + histogramPowerOfTwo()
     }
