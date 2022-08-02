@@ -7,9 +7,9 @@ func main() {
         return
     }
 
-    let fileName = CommandLine.arguments[1]
+//    let fileName = CommandLine.arguments[1]
 
-    var statistics = LatencyStatistics()
+//    var statistics = LatencyStatistics()
 //    statistics.process(fileName: fileName)
 //    statistics.printStatistics();
 }
