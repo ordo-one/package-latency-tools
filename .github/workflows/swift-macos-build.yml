@@ -4,13 +4,23 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
+    paths:
+      - '**.swift'
+      - 'Package.resolved'
+      - '**.c'
+      - '**.h'
   pull_request:
     branches: [ main ]
-  
+    paths:
+      - '**.swift'
+      - 'Package.resolved'
+      - '**.c'
+      - '**.h'
+
 jobs:
   build-macos:
     timeout-minutes: 60
-    runs-on: [self-hosted, macos-12]
+    runs-on: [self-hosted, macos-13]
 
     steps:
     - name: Wipe gitconfig

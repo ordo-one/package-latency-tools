@@ -4,8 +4,19 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
+    paths:
+      - '**.swift'
+      - 'Package.resolved'
+      - '**.c'
+      - '**.h'
   pull_request:
     branches: [ main ]
+    paths:
+      - '**.swift'
+      - 'Package.resolved'
+      - '**.c'
+      - '**.h'
+
 jobs:
   test-code-coverage:
     runs-on: [swift-latest, ubuntu-latest, self-hosted]
