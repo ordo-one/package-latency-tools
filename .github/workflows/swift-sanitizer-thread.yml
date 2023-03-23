@@ -4,15 +4,25 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
+    paths:
+      - '**.swift'
+      - 'Package.resolved'
+      - '**.c'
+      - '**.h'
   pull_request:
     branches: [ main ]
+    paths:
+      - '**.swift'
+      - 'Package.resolved'
+      - '**.c'
+      - '**.h'
 
 jobs:
   thread-sanitizer:
     strategy:
       fail-fast: false
       matrix:
-        os: [[swift-latest, ubuntu-latest, self-hosted], [swift-nightly, ubuntu-latest, self-hosted], [macos-12, self-hosted]]
+        os: [[swift-latest, ubuntu-latest, self-hosted], [swift-nightly, ubuntu-latest, self-hosted], [macos-13, self-hosted]]
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60

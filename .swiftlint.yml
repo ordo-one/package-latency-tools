@@ -9,9 +9,12 @@
 ####################################################################
 
 included:
+  - Benchmarks
   - Sources
   - Tests
 excluded:
+analyzer_rules:
+  - unused_import
 opt_in_rules:
   - anyobject_protocol
   - array_init
@@ -34,7 +37,6 @@ opt_in_rules:
   - extension_access_modifier
   - fallthrough
   - fatal_error_message
-  - file_header
   - file_name
   - first_where
   - flatmap_over_map_reduce
@@ -73,7 +75,6 @@ opt_in_rules:
   - test_case_accessibility
   - toggle_bool
   - unavailable_function
-  - unused_import
   - unneeded_parentheses_in_closure_argument
   - unowned_variable_capture
   - untyped_error_in_catch
@@ -82,3 +83,12 @@ opt_in_rules:
   - vertical_whitespace_opening_braces
   - xct_specific_matcher
   - yoda_condition
+line_length:
+  warning: 140
+  error: 140
+  ignores_comments: true
+  ignores_urls: true
+  ignores_function_declarations: true
+  ignores_interpolated_strings: true
+identifier_name:
+  excluded: [id, i, j, k]
